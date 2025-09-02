@@ -2,7 +2,8 @@
 set -euo pipefail
 
 OPENAPI_DIR="${1:?target/openapi}"
-OUT_ROOT="${2:?target/generated-sources}"
+# OUT_ROOT="${2:?target/generated-sources}"
+OUT_ROOT="${2:-src/gen/java}"   # default to src/gen/java if not passed
 GEN_VER="${3:?7.12.0}"
 
 mkdir -p "$OUT_ROOT"

@@ -5,10 +5,10 @@
     <artifactId>backend</artifactId>
     <version>1.0.0-SNAPSHOT</version>
   </parent>
-  <artifactId>ticketsystem-avro</artifactId>
+  <artifactId>ticket-store-avro</artifactId>
   <packaging>jar</packaging>
-  <name>ticketsystem-avro</name>
-  <url>https://github.com/YOUR_GH_OWNER/YOUR_REPO</url>
+  <name>ticket-store-avro</name>
+  <url>https://github.com/phungle2508/ticket-store-avro</url>
   <licenses>
     <license>
       <name>Apache License, Version 2.0</name>
@@ -16,9 +16,9 @@
     </license>
   </licenses>
   <scm>
-    <url>https://github.com/YOUR_GH_OWNER/YOUR_REPO</url>
-    <connection>scm:git:git://github.com/YOUR_GH_OWNER/YOUR_REPO.git</connection>
-    <developerConnection>scm:git:ssh://github.com:YOUR_GH_OWNER/YOUR_REPO.git</developerConnection>
+    <url>https://github.com/phungle2508/ticket-store-avro</url>
+    <connection>scm:git:https://github.com/phungle2508/ticket-store-avro.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/phungle2508/ticket-store-avro.git</developerConnection>
   </scm>
   <properties>
     <maven.compiler.source>17</maven.compiler.source>
@@ -83,13 +83,12 @@
     <repository>
       <id>github</id>
       <name>GitHub Packages</name>
-      <url>https://maven.pkg.github.com/YOUR_GH_OWNER/YOUR_REPO</url>
+      <url>https://maven.pkg.github.com/phungle2508/ticket-store-avro</url>
     </repository>
-    <!-- (tùy chọn) snapshots; nếu muốn tách -->
     <snapshotRepository>
       <id>github</id>
       <name>GitHub Packages - Snapshots</name>
-      <url>https://maven.pkg.github.com/YOUR_GH_OWNER/YOUR_REPO</url>
+      <url>https://maven.pkg.github.com/phungle2508/ticket-store-avro</url>
     </snapshotRepository>
   </distributionManagement>
   <!-- (khuyến nghị) metadata tối thiểu -->

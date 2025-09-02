@@ -1,11 +1,11 @@
-name: Publish ticketsystem-avro
+name: Publish ticket-store-avro
 
 on:
   push:
-    paths:
-      - 'backend/ticketsystem-avro/**'
-      - '.github/workflows/publish.yml'
     branches: [ main ]
+    paths:
+      - 'backend/ticket-store-avro/**'
+      - '.github/workflows/publish.yml'
   workflow_dispatch:
 
 jobs:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write   # cần để push GitHub Packages
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -23,8 +23,6 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
-          server-id: github
-          settings-path: ${{ github.workspace }}
 
       - name: Create Maven settings.xml for GitHub Packages
         run: |
@@ -40,8 +38,8 @@ jobs:
           </settings>
           XML
 
-      - name: Build & Deploy ticketsystem-avro
-        working-directory: backend/ticketsystem-avro
+      - name: Build & Deploy ticket-store-avro
+        working-directory: backend/ticket-store-avro
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mvn -s $GITHUB_WORKSPACE/settings.xml -DskipTests deploy

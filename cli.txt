@@ -1,3 +1,5 @@
+export KEYCLOAK_USERNAME=''
+export KEYCLOAK_PASSWORD=''
+
 mvn clean package
 
-gh workflow run "Publish ticket-store-avro"

@@ -1,13 +1,15 @@
-<project>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <parent>
-    <groupId>com.ticketsystem</groupId>
-    <artifactId>backend</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-  </parent>
+
+  <!-- Standalone coordinates -->
+  <groupId>com.ticketsystem</groupId>
   <artifactId>ticket-store-avro</artifactId>
+  <version>0.1.0</version>
   <packaging>jar</packaging>
   <name>ticket-store-avro</name>
+
   <url>https://github.com/phungle2508/ticket-store-avro</url>
   <licenses>
     <license>
@@ -20,46 +22,45 @@
     <connection>scm:git:https://github.com/phungle2508/ticket-store-avro.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/phungle2508/ticket-store-avro.git</developerConnection>
   </scm>
+
   <properties>
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <avro.version>1.12.0</avro.version>
   </properties>
+
   <dependencies>
-    <!-- Avro runtime để import org.apache.avro.* -->
     <dependency>
       <groupId>org.apache.avro</groupId>
       <artifactId>avro</artifactId>
       <version>${avro.version}</version>
     </dependency>
   </dependencies>
+
   <build>
     <plugins>
+      <!-- Use stable plugin 1.11.3 even if runtime is 1.12.0 -->
       <plugin>
         <groupId>org.apache.avro</groupId>
         <artifactId>avro-maven-plugin</artifactId>
-        <version>${avro.version}</version>
+        <version>1.11.3</version>
         <executions>
           <execution>
             <id>schemas</id>
             <phase>generate-sources</phase>
-            <goals>
-              <goal>schema</goal>
-            </goals>
+            <goals><goal>schema</goal></goals>
             <configuration>
               <sourceDirectory>${project.basedir}/src/main/resources/avro</sourceDirectory>
               <outputDirectory>${project.build.directory}/generated-sources/avro</outputDirectory>
               <stringType>String</stringType>
               <createSetters>false</createSetters>
               <enableDecimalLogicalType>true</enableDecimalLogicalType>
-              <includes>
-                <include>**/*.avsc</include>
-              </includes>
+              <includes><include>**/*.avsc</include></includes>
             </configuration>
           </execution>
         </executions>
       </plugin>
-      <!-- (tùy chọn) Đảm bảo generated sources vào classpath compile -->
+
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.11.0</version>
@@ -68,17 +69,15 @@
         </configuration>
       </plugin>
     </plugins>
-    <!-- Đóng gói .avsc vào JAR (nếu service cần đọc schema ở runtime) -->
+
     <resources>
       <resource>
         <directory>src/main/resources</directory>
-        <includes>
-          <include>**/*.avsc</include>
-        </includes>
+        <includes><include>**/*.avsc</include></includes>
       </resource>
     </resources>
   </build>
-  <!-- nơi publish -->
+
   <distributionManagement>
     <repository>
       <id>github</id>
@@ -91,5 +90,4 @@
       <url>https://maven.pkg.github.com/phungle2508/ticket-store-avro</url>
     </snapshotRepository>
   </distributionManagement>
-  <!-- (khuyến nghị) metadata tối thiểu -->
 </project>

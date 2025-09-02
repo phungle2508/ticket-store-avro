@@ -3,7 +3,4 @@ export KEYCLOAK_PASSWORD=''
 
 mvn clean package
 
-bash scripts/generate-clients.sh \
-  target/openapi \
-  src/gen/java \ 
-  7.12.0
+mvn clean package -Prun-openapi

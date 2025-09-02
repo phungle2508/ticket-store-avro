@@ -1,9 +1,0 @@
-.openapi-generator-ignore
-README.md
-pom.xml
-src/main/java/com/ticketsystem/msroute/client/api/MsRouteKafkaResourceMsrouteApi.java
-src/main/java/com/ticketsystem/msroute/client/api/RouteResourceMsrouteApi.java
-src/main/java/com/ticketsystem/msroute/client/api/ScheduleResourceMsrouteApi.java
-src/main/java/com/ticketsystem/msroute/client/model/ResponseBodyEmitterDto.java
-src/main/java/com/ticketsystem/msroute/client/model/RouteDTODto.java
-src/main/java/com/ticketsystem/msroute/client/model/ScheduleDTODto.java

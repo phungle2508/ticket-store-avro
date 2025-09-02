@@ -3,7 +3,6 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <!-- Spring Boot parent -->
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
@@ -19,27 +18,24 @@
     <java.version>17</java.version>
     <spring-cloud.version>2024.0.1</spring-cloud.version>
     <openapi.generator.version>7.12.0</openapi.generator.version>
-    <!-- ===== Skip remote steps on CI (JitPack sets CI=true) ===== -->
-    <skip.remote.gen>${env.CI}</skip.remote.gen>
-    <!-- ===== Keycloak (local dev; CI steps are skipped anyway) ===== -->
+    <!-- Keycloak (for scripts) -->
     <keycloak.token.url>https://keycloak.appf4s.io.vn/realms/jhipster/protocol/openid-connect/token</keycloak.token.url>
     <keycloak.clientId>web_app</keycloak.clientId>
     <keycloak.username>${env.KEYCLOAK_USERNAME}</keycloak.username>
     <keycloak.password>${env.KEYCLOAK_PASSWORD}</keycloak.password>
-    <!-- ===== Consul + Gateway ===== -->
+    <!-- Consul + Gateway -->
     <consul.url>https://consul.appf4s.io.vn</consul.url>
     <gateway.url>https://gateway.microservices.appf4s.io.vn</gateway.url>
-    <!-- ===== OpenAPI I/O paths ===== -->
+    <!-- OpenAPI paths -->
     <openapi.auth.file>${project.build.directory}/openapi-auth.properties</openapi.auth.file>
     <openapi.dir>${project.build.directory}/openapi</openapi.dir>
-    <!-- <openapi.generated.dir>${project.build.directory}/generated-sources</openapi.generated.dir> -->
-    <openapi.generated.dir>${project.basedir}/src/gen/java</openapi.generated.dir>
-    <!-- Which services to include -->
+    <!-- IMPORTANT: generate directly into src/main/java -->
+    <openapi.generated.dir>${project.basedir}/src/main/java</openapi.generated.dir>
     <service.name.pattern>^ms[-_]?.*</service.name.pattern>
-    <!-- ===== Avro ===== -->
+    <!-- Avro: schemas in src/main/avro; code into src/main/java -->
     <avro.version>1.12.0</avro.version>
-    <avro.source.dir>${project.basedir}/src/main/resources/avro</avro.source.dir>
-    <avro.out.dir>${project.build.directory}/generated-sources/avro</avro.out.dir>
+    <avro.source.dir>${project.basedir}/src/main/avro</avro.source.dir>
+    <avro.out.dir>${project.basedir}/src/main/java</avro.out.dir>
   </properties>
   <dependencyManagement>
     <dependencies>
@@ -58,7 +54,7 @@
       <groupId>org.springframework.cloud</groupId>
       <artifactId>spring-cloud-starter-openfeign</artifactId>
     </dependency>
-    <!-- Used by generated code -->
+    <!-- Generated client deps -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-validation</artifactId>
@@ -84,127 +80,6 @@
   </dependencies>
   <build>
     <plugins>
-      <!-- ========================= -->
-      <!-- Feign pipeline (local only; skipped on CI) -->
-      <!-- ========================= -->
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
-        <version>3.5.0</version>
-        <executions>
-          <execution>
-            <id>fetch-token</id>
-            <phase>validate</phase>
-            <goals>
-              <goal>exec</goal>
-            </goals>
-            <configuration>
-              <skip>${skip.remote.gen}</skip>
-              <executable>bash</executable>
-              <arguments>
-                <argument>${project.basedir}/scripts/fetch-token.sh</argument>
-                <argument>${keycloak.token.url}</argument>
-                <argument>${keycloak.clientId}</argument>
-                <argument>${keycloak.username}</argument>
-                <argument>${keycloak.password}</argument>
-                <argument>${openapi.auth.file}</argument>
-              </arguments>
-            </configuration>
-          </execution>
-          <execution>
-            <id>download-all-openapis</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>exec</goal>
-            </goals>
-            <configuration>
-              <skip>${skip.remote.gen}</skip>
-              <executable>bash</executable>
-              <arguments>
-                <argument>${project.basedir}/scripts/consul-download-openapis.sh</argument>
-                <argument>${openapi.auth.file}</argument>
-                <argument>${consul.url}</argument>
-                <argument>${gateway.url}</argument>
-                <argument>${openapi.dir}</argument>
-                <argument>${service.name.pattern}</argument>
-                <argument>gateway</argument>
-              </arguments>
-            </configuration>
-          </execution>
-          <execution>
-            <id>generate-all-clients</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>exec</goal>
-            </goals>
-            <configuration>
-              <skip>${skip.remote.gen}</skip>
-              <executable>bash</executable>
-              <arguments>
-                <argument>${project.basedir}/scripts/generate-clients.sh</argument>
-                <argument>${openapi.dir}</argument>
-                <argument>${openapi.generated.dir}</argument>
-                <argument>${openapi.generator.version}</argument>
-              </arguments>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <!-- Reading ${openapi.auth.file} (skip on CI where it doesn't exist) -->
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>properties-maven-plugin</artifactId>
-        <version>1.2.1</version>
-        <executions>
-          <execution>
-            <id>load-token</id>
-            <phase>initialize</phase>
-            <goals>
-              <goal>read-project-properties</goal>
-            </goals>
-            <configuration>
-              <skip>${skip.remote.gen}</skip>
-              <files>
-                <file>${openapi.auth.file}</file>
-              </files>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <!-- Add pre-generated clients you commit under src/gen/java -->
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>build-helper-maven-plugin</artifactId>
-        <version>3.5.0</version>
-        <executions>
-          <execution>
-            <id>add-pre-gen-sources</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>add-source</goal>
-            </goals>
-            <configuration>
-              <sources>
-                <source>${project.basedir}/src/gen/java</source>
-              </sources>
-            </configuration>
-          </execution>
-          <!-- Also include local generated sources + Avro outputs when present -->
-          <execution>
-            <id>add-generated-sources</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>add-source</goal>
-            </goals>
-            <configuration>
-              <sources>
-                <source>${openapi.generated.dir}</source>
-                <source>${avro.out.dir}</source>
-              </sources>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.apache.avro</groupId>
         <artifactId>avro-maven-plugin</artifactId>
@@ -229,24 +104,109 @@
           </execution>
         </executions>
       </plugin>
-      <!-- Compiler sees Avro sources -->
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.11.0</version>
         <configuration>
           <release>${java.version}</release>
-          <generatedSourcesDirectory>${avro.out.dir}</generatedSourcesDirectory>
         </configuration>
       </plugin>
     </plugins>
-    <!-- Make .avsc files available as resources (optional) -->
-    <resources>
-      <resource>
-        <directory>src/main/resources</directory>
-        <includes>
-          <include>**/*.avsc</include>
-        </includes>
-      </resource>
-    </resources>
   </build>
+  <profiles>
+    <profile>
+      <id>run-openapi</id>
+      <!-- Activate by either -Prun-openapi OR -Drun-openapi -->
+      <activation>
+        <property>
+          <name>run-openapi</name>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <!-- Load token (only when profile is active) -->
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>properties-maven-plugin</artifactId>
+            <version>1.2.1</version>
+            <executions>
+              <execution>
+                <id>load-token</id>
+                <phase>initialize</phase>
+                <goals>
+                  <goal>read-project-properties</goal>
+                </goals>
+                <configuration>
+                  <files>
+                    <file>${openapi.auth.file}</file>
+                  </files>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <!-- Run your shell scripts ONLY under this profile -->
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <version>3.5.0</version>
+            <executions>
+              <execution>
+                <id>fetch-token</id>
+                <phase>validate</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <executable>bash</executable>
+                  <arguments>
+                    <argument>${project.basedir}/scripts/fetch-token.sh</argument>
+                    <argument>${keycloak.token.url}</argument>
+                    <argument>${keycloak.clientId}</argument>
+                    <argument>${keycloak.username}</argument>
+                    <argument>${keycloak.password}</argument>
+                    <argument>${openapi.auth.file}</argument>
+                  </arguments>
+                </configuration>
+              </execution>
+              <execution>
+                <id>download-all-openapis</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <executable>bash</executable>
+                  <arguments>
+                    <argument>${project.basedir}/scripts/consul-download-openapis.sh</argument>
+                    <argument>${openapi.auth.file}</argument>
+                    <argument>${consul.url}</argument>
+                    <argument>${gateway.url}</argument>
+                    <argument>${openapi.dir}</argument>
+                    <argument>${service.name.pattern}</argument>
+                    <argument>gateway</argument>
+                  </arguments>
+                </configuration>
+              </execution>
+              <execution>
+                <id>generate-all-clients</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <executable>bash</executable>
+                  <arguments>
+                    <argument>${project.basedir}/scripts/generate-clients.sh</argument>
+                    <argument>${openapi.dir}</argument>
+                    <argument>${openapi.generated.dir}</argument>
+                    <argument>${openapi.generator.version}</argument>
+                  </arguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

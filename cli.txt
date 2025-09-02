@@ -1,1 +1,3 @@
 mvn clean package
+
+gh workflow run "Publish ticket-store-avro"

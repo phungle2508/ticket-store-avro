@@ -1,6 +1,5 @@
 export KEYCLOAK_USERNAME=''
 export KEYCLOAK_PASSWORD=''
 
-mvn clean package
-
 mvn clean package -Prun-openapi
+mvn clean package

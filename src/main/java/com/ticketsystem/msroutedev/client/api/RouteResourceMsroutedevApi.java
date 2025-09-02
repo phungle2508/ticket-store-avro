@@ -1,11 +1,11 @@
-package com.ticketsystem.msroute.client.api;
+package com.ticketsystem.msroutedev.client.api;
 
-import com.ticketsystem.msroute.client.invoker.ApiClient;
-import com.ticketsystem.msroute.client.invoker.EncodingUtils;
-import com.ticketsystem.msroute.client.model.ApiResponse;
+import com.ticketsystem.msroutedev.client.invoker.ApiClient;
+import com.ticketsystem.msroutedev.client.invoker.EncodingUtils;
+import com.ticketsystem.msroutedev.client.model.ApiResponse;
 
 import java.time.OffsetDateTime;
-import com.ticketsystem.msroute.client.model.RouteDTO;
+import com.ticketsystem.msroutedev.client.model.RouteDTO;
 import java.util.UUID;
 
 import java.util.ArrayList;
@@ -15,7 +15,7 @@ import java.util.Map;
 import feign.*;
 
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.14.0")
-public interface RouteResourceMsrouteApi extends ApiClient.Api {
+public interface RouteResourceMsroutedevApi extends ApiClient.Api {
 
 
   /**

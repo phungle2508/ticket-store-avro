@@ -1,6 +1,0 @@
-com/ticketsystem/msroute/client/api/MsRouteKafkaResourceMsrouteApi.java
-com/ticketsystem/msroute/client/api/RouteResourceMsrouteApi.java
-com/ticketsystem/msroute/client/api/ScheduleResourceMsrouteApi.java
-com/ticketsystem/msroute/client/model/ResponseBodyEmitterDto.java
-com/ticketsystem/msroute/client/model/RouteDTODto.java
-com/ticketsystem/msroute/client/model/ScheduleDTODto.java

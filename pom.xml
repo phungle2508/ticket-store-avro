@@ -3,7 +3,6 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
   <!-- Spring Boot parent -->
   <parent>
     <groupId>org.springframework.boot</groupId>
@@ -11,45 +10,37 @@
     <version>3.4.4</version>
     <relativePath/>
   </parent>
-
   <groupId>com.ticketsystem.clients</groupId>
   <artifactId>client-open-feign-avro</artifactId>
   <version>0.1.0</version>
   <name>client-open-feign-avro</name>
   <packaging>jar</packaging>
-
   <properties>
     <java.version>17</java.version>
     <spring-cloud.version>2024.0.1</spring-cloud.version>
     <openapi.generator.version>7.12.0</openapi.generator.version>
-
     <!-- ===== Skip remote steps on CI (JitPack sets CI=true) ===== -->
     <skip.remote.gen>${env.CI}</skip.remote.gen>
-
     <!-- ===== Keycloak (local dev; CI steps are skipped anyway) ===== -->
     <keycloak.token.url>https://keycloak.appf4s.io.vn/realms/jhipster/protocol/openid-connect/token</keycloak.token.url>
     <keycloak.clientId>web_app</keycloak.clientId>
     <keycloak.username>${env.KEYCLOAK_USERNAME}</keycloak.username>
     <keycloak.password>${env.KEYCLOAK_PASSWORD}</keycloak.password>
-
     <!-- ===== Consul + Gateway ===== -->
     <consul.url>https://consul.appf4s.io.vn</consul.url>
     <gateway.url>https://gateway.microservices.appf4s.io.vn</gateway.url>
-
     <!-- ===== OpenAPI I/O paths ===== -->
     <openapi.auth.file>${project.build.directory}/openapi-auth.properties</openapi.auth.file>
     <openapi.dir>${project.build.directory}/openapi</openapi.dir>
-    <openapi.generated.dir>${project.build.directory}/generated-sources</openapi.generated.dir>
-
+    <!-- <openapi.generated.dir>${project.build.directory}/generated-sources</openapi.generated.dir> -->
+    <openapi.generated.dir>${project.basedir}/src/gen/java</openapi.generated.dir>
     <!-- Which services to include -->
     <service.name.pattern>^ms[-_]?.*</service.name.pattern>
-
     <!-- ===== Avro ===== -->
     <avro.version>1.12.0</avro.version>
     <avro.source.dir>${project.basedir}/src/main/resources/avro</avro.source.dir>
     <avro.out.dir>${project.build.directory}/generated-sources/avro</avro.out.dir>
   </properties>
-
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -61,14 +52,12 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
-
   <dependencies>
     <!-- OpenFeign -->
     <dependency>
       <groupId>org.springframework.cloud</groupId>
       <artifactId>spring-cloud-starter-openfeign</artifactId>
     </dependency>
-
     <!-- Used by generated code -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -86,7 +75,6 @@
       <version>0.2.6</version>
       <scope>provided</scope>
     </dependency>
-
     <!-- Avro runtime -->
     <dependency>
       <groupId>org.apache.avro</groupId>
@@ -94,7 +82,6 @@
       <version>${avro.version}</version>
     </dependency>
   </dependencies>
-
   <build>
     <plugins>
       <!-- ========================= -->
@@ -108,7 +95,9 @@
           <execution>
             <id>fetch-token</id>
             <phase>validate</phase>
-            <goals><goal>exec</goal></goals>
+            <goals>
+              <goal>exec</goal>
+            </goals>
             <configuration>
               <skip>${skip.remote.gen}</skip>
               <executable>bash</executable>
@@ -122,11 +111,12 @@
               </arguments>
             </configuration>
           </execution>
-
           <execution>
             <id>download-all-openapis</id>
             <phase>generate-sources</phase>
-            <goals><goal>exec</goal></goals>
+            <goals>
+              <goal>exec</goal>
+            </goals>
             <configuration>
               <skip>${skip.remote.gen}</skip>
               <executable>bash</executable>
@@ -141,11 +131,12 @@
               </arguments>
             </configuration>
           </execution>
-
           <execution>
             <id>generate-all-clients</id>
             <phase>generate-sources</phase>
-            <goals><goal>exec</goal></goals>
+            <goals>
+              <goal>exec</goal>
+            </goals>
             <configuration>
               <skip>${skip.remote.gen}</skip>
               <executable>bash</executable>
@@ -159,7 +150,6 @@
           </execution>
         </executions>
       </plugin>
-
       <!-- Reading ${openapi.auth.file} (skip on CI where it doesn't exist) -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -169,7 +159,9 @@
           <execution>
             <id>load-token</id>
             <phase>initialize</phase>
-            <goals><goal>read-project-properties</goal></goals>
+            <goals>
+              <goal>read-project-properties</goal>
+            </goals>
             <configuration>
               <skip>${skip.remote.gen}</skip>
               <files>
@@ -179,7 +171,6 @@
           </execution>
         </executions>
       </plugin>
-
       <!-- Add pre-generated clients you commit under src/gen/java -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -189,19 +180,22 @@
           <execution>
             <id>add-pre-gen-sources</id>
             <phase>generate-sources</phase>
-            <goals><goal>add-source</goal></goals>
+            <goals>
+              <goal>add-source</goal>
+            </goals>
             <configuration>
               <sources>
                 <source>${project.basedir}/src/gen/java</source>
               </sources>
             </configuration>
           </execution>
-
           <!-- Also include local generated sources + Avro outputs when present -->
           <execution>
             <id>add-generated-sources</id>
             <phase>generate-sources</phase>
-            <goals><goal>add-source</goal></goals>
+            <goals>
+              <goal>add-source</goal>
+            </goals>
             <configuration>
               <sources>
                 <source>${openapi.generated.dir}</source>
@@ -211,10 +205,6 @@
           </execution>
         </executions>
       </plugin>
-
-      <!-- ========================= -->
-      <!-- Avro code generation (runs on CI) -->
-      <!-- ========================= -->
       <plugin>
         <groupId>org.apache.avro</groupId>
         <artifactId>avro-maven-plugin</artifactId>
@@ -223,7 +213,9 @@
           <execution>
             <id>schemas</id>
             <phase>generate-sources</phase>
-            <goals><goal>schema</goal></goals>
+            <goals>
+              <goal>schema</goal>
+            </goals>
             <configuration>
               <sourceDirectory>${avro.source.dir}</sourceDirectory>
               <outputDirectory>${avro.out.dir}</outputDirectory>
@@ -237,7 +229,6 @@
           </execution>
         </executions>
       </plugin>
-
       <!-- Compiler sees Avro sources -->
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -248,7 +239,6 @@
         </configuration>
       </plugin>
     </plugins>
-
     <!-- Make .avsc files available as resources (optional) -->
     <resources>
       <resource>

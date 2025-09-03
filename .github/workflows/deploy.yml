@@ -11,7 +11,24 @@ jobs:
     permissions:
       contents: read
     environment: secrets
+    
     steps:
+      # First, checkout the repository
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history for proper git operations
+          fetch-depth: 0
+          # Use a token that has push permissions
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Then configure Git identity (now we're in a git directory)
+      - name: 🔧 Configure Git identity
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      # Deploy to VPS
       - name: 📦 SSH Deploy to VPS
         uses: appleboy/ssh-action@v1
         with:
@@ -22,24 +39,19 @@ jobs:
           script: |
             set -euo pipefail
             ticketsystem_avro_DIR="/root/f4-microserices-vps-configuration/ticket-store/backend/ticketsystem-avro"
-
             echo "📁 Navigating to project directory..."
             cd "$ticketsystem_avro_DIR"
-
             export KEYCLOAK_USERNAME='${{ secrets.KEYCLOAK_USERNAME }}'
             export KEYCLOAK_PASSWORD='${{ secrets.KEYCLOAK_PASSWORD }}'
-
             mvn -v
             mvn -e -U -B clean package -Prun-openapi
-      - name: 🔧 Configure Git identity
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-      # ---- GIT: TRIGGER  ----
+
+      # ---- GIT: TRIGGER ----
       - name: 📤 Push code to GitHub (origin)
         run: |
           # Push current HEAD to desired branch. Adjust 'master' -> 'main' if needed.
           git push origin HEAD:master
+
       # ---- JitPack: TRIGGER & CHECK ----
       - name: 🔔 Trigger JitPack build (master-SNAPSHOT)
         run: |

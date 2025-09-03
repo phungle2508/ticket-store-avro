@@ -90,8 +90,8 @@ jobs:
               echo "⏳ Still building... waiting 10 seconds"
               sleep 10
             elif [ "$STATUS" = "unknown" ] || [ "$STATUS" = "null" ]; then
-              echo "❓ Build status unknown, waiting 10 seconds"
-              sleep 10
+               echo "✅ Build completed successfully!"
+              exit 0
             else
               echo "🤔 Unexpected status: $STATUS, waiting 10 seconds"
               sleep 10

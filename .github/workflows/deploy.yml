@@ -60,51 +60,67 @@ jobs:
           # Hitting build.log for a SNAPSHOT triggers a build if needed
           curl -sS --max-time 5 "https://jitpack.io/com/github/phungle2508/ticket-store-avro/master-SNAPSHOT/build.log" || true
 
-      - name: 🔎 Wait for JitPack build to complete
+      - name: 🔎 Wait for JitPack build(s) to complete
         run: |
           set -euo pipefail
-          
-          echo "⏳ Waiting for master-SNAPSHOT build to complete..."
-          
-          MAX_ATTEMPTS=30  # Maximum wait time: 30 attempts * 10 seconds = 5 minutes
+          sleep 5
+          echo "⏳ Waiting for JitPack builds to finish for com.github.phungle2508:ticket-store-avro ..."
+      
+          MAX_ATTEMPTS=30  # 30 * 5s = 2.5 minutes
           ATTEMPT=1
-          
+          API_URL="https://jitpack.io/api/builds/com.github.phungle2508/ticket-store-avro"
+      
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            echo "🔍 Attempt $ATTEMPT/$MAX_ATTEMPTS - Checking build status..."
-            
-            # Get the build status
-            RESPONSE=$(curl -sS "https://jitpack.io/api/builds/com.github.phungle2508/ticket-store-avro")
-            echo "JITPACK_RESPONSE: $RESPONSE" | sed -e 's/^/JITPACK_BUILDS: /'
-            
-            # Extract master-SNAPSHOT status
-            STATUS=$(echo "$RESPONSE" | jq -r '."com.github.phungle2508"."ticket-store-avro"."master-SNAPSHOT" // "unknown"')
-            echo "📊 master-SNAPSHOT status: $STATUS"
-            
-            # Check if build is complete (ok or Error)
-            if [ "$STATUS" = "ok" ]; then
-              echo "✅ Build completed successfully!"
-              exit 0
-            elif [ "$STATUS" = "Error" ]; then
-              echo "❌ Build failed with Error status!"
-              exit 1
-            elif [ "$STATUS" = "Building" ]; then
-              echo "⏳ Still building... waiting 10 seconds"
-              sleep 10
-            elif [ "$STATUS" = "unknown" ] || [ "$STATUS" = "null" ]; then
-               echo "✅ Build completed successfully!"
-              exit 0
-            else
-              echo "🤔 Unexpected status: $STATUS, waiting 10 seconds"
-              sleep 10
+            echo "🔍 Attempt $ATTEMPT/$MAX_ATTEMPTS - Checking build statuses..."
+      
+            RESPONSE="$(curl -sS "$API_URL" || true)"
+            echo "JITPACK_BUILDS: $RESPONSE"
+      
+            # If response is empty or invalid, try again
+            if [ -z "$RESPONSE" ] || ! echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
+              echo "⚠️  No/invalid response from JitPack API; retrying in 5s..."
+              sleep 5
+              ATTEMPT=$((ATTEMPT + 1))
+              continue
             fi
-            
+      
+            # Pull the whole versions->status map
+            VERSIONS_NODE=$(echo "$RESPONSE" | jq -r '."com.github.phungle2508"."ticket-store-avro" // {}')
+      
+            # If no versions found, treat as success (nothing building)
+            if [ "$(echo "$VERSIONS_NODE" | jq 'length')" -eq 0 ]; then
+              echo "✅ No versions found (nothing building)."
+              exit 0
+            fi
+      
+            # List versions that are currently Building
+            BUILDING_LIST=$(echo "$VERSIONS_NODE" | jq -r 'to_entries | map(select(.value=="Building")) | map(.key) | join(", ")')
+            BUILDING_COUNT=$(echo "$VERSIONS_NODE" | jq -r 'to_entries | map(select(.value=="Building")) | length')
+      
+            # Optionally log other statuses (ok/Error) for visibility
+            OK_LIST=$(echo "$VERSIONS_NODE" | jq -r 'to_entries | map(select(.value=="ok")) | map(.key) | join(", ")')
+            ERR_LIST=$(echo "$VERSIONS_NODE" | jq -r 'to_entries | map(select(.value=="Error")) | map(.key) | join(", ")')
+      
+            echo "📊 ok:      ${OK_LIST:-<none>}"
+            echo "📊 Error:   ${ERR_LIST:-<none>}"
+            echo "📊 Building:${BUILDING_LIST:-<none>}"
+      
+            if [ "$BUILDING_COUNT" -gt 0 ]; then
+              echo "⏳ Still building ($BUILDING_COUNT version(s))... sleeping 5s"
+              sleep 5
+            else
+              echo "✅ No builds in 'Building' state. Done."
+              exit 0
+            fi
+      
             ATTEMPT=$((ATTEMPT + 1))
           done
-          
-          echo "⏰ Timeout reached after $MAX_ATTEMPTS attempts (5 minutes)"
-          echo "🔍 Final status check..."
-          curl -sS "https://jitpack.io/api/builds/com.github.phungle2508/ticket-store-avro" | jq . | sed -e 's/^/FINAL_STATUS: /'
+      
+          echo "⏰ Timeout after $MAX_ATTEMPTS attempts."
+          echo "🔍 Final status:"
+          curl -sS "$API_URL" | jq . | sed -e 's/^/FINAL_STATUS: /'
           exit 1
+
 
       - name: ✅ Get latest successful build (latestOk)
         run: |

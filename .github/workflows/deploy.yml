@@ -3,7 +3,7 @@ name: 🚀 Deploy Microservice to VPS
 on:
   push:
     branches:
-      - update-vps
+      - master
 
 jobs:
   deploy:

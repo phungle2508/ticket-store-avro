@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     environment: secrets
     
     steps:
@@ -19,8 +19,8 @@ jobs:
         with:
           # Fetch full history for proper git operations
           fetch-depth: 0
-          # Use a token that has push permissions
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Use a Personal Access Token with repo permissions
+          token: ${{ secrets.PAT_TOKEN }}
 
       # Then configure Git identity (now we're in a git directory)
       - name: 🔧 Configure Git identity
@@ -59,10 +59,51 @@ jobs:
           # Hitting build.log for a SNAPSHOT triggers a build if needed
           curl -sS --max-time 5 "https://jitpack.io/com/github/phungle2508/ticket-store-avro/master-SNAPSHOT/build.log" || true
 
-      - name: 🔎 Check latest build info (any status)
+      - name: 🔎 Wait for JitPack build to complete
         run: |
           set -euo pipefail
-          curl -sS "https://jitpack.io/api/builds/com.github.phungle2508/ticket-store-avro" | jq . | sed -e 's/^/JITPACK_BUILDS: /'
+          
+          echo "⏳ Waiting for master-SNAPSHOT build to complete..."
+          
+          MAX_ATTEMPTS=30  # Maximum wait time: 30 attempts * 10 seconds = 5 minutes
+          ATTEMPT=1
+          
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "🔍 Attempt $ATTEMPT/$MAX_ATTEMPTS - Checking build status..."
+            
+            # Get the build status
+            RESPONSE=$(curl -sS "https://jitpack.io/api/builds/com.github.phungle2508/ticket-store-avro")
+            echo "JITPACK_RESPONSE: $RESPONSE" | sed -e 's/^/JITPACK_BUILDS: /'
+            
+            # Extract master-SNAPSHOT status
+            STATUS=$(echo "$RESPONSE" | jq -r '."com.github.phungle2508"."ticket-store-avro"."master-SNAPSHOT" // "unknown"')
+            echo "📊 master-SNAPSHOT status: $STATUS"
+            
+            # Check if build is complete (ok or Error)
+            if [ "$STATUS" = "ok" ]; then
+              echo "✅ Build completed successfully!"
+              exit 0
+            elif [ "$STATUS" = "Error" ]; then
+              echo "❌ Build failed with Error status!"
+              exit 1
+            elif [ "$STATUS" = "Building" ]; then
+              echo "⏳ Still building... waiting 10 seconds"
+              sleep 10
+            elif [ "$STATUS" = "unknown" ] || [ "$STATUS" = "null" ]; then
+              echo "❓ Build status unknown, waiting 10 seconds"
+              sleep 10
+            else
+              echo "🤔 Unexpected status: $STATUS, waiting 10 seconds"
+              sleep 10
+            fi
+            
+            ATTEMPT=$((ATTEMPT + 1))
+          done
+          
+          echo "⏰ Timeout reached after $MAX_ATTEMPTS attempts (5 minutes)"
+          echo "🔍 Final status check..."
+          curl -sS "https://jitpack.io/api/builds/com.github.phungle2508/ticket-store-avro" | jq . | sed -e 's/^/FINAL_STATUS: /'
+          exit 1
 
       - name: ✅ Get latest successful build (latestOk)
         run: |

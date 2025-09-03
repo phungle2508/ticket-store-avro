@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     environment: secrets
     
     steps:
@@ -19,8 +19,8 @@ jobs:
         with:
           # Fetch full history for proper git operations
           fetch-depth: 0
-          # Use a Personal Access Token with repo permissions
-          token: ${{ secrets.PAT_TOKEN }}
+          # Use a token that has push permissions
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       # Then configure Git identity (now we're in a git directory)
       - name: 🔧 Configure Git identity

@@ -31,16 +31,15 @@ jobs:
 
             mvn -v
             mvn -e -U -B clean package -Prun-openapi
+      - name: 🔧 Configure Git identity
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
       # ---- GIT: TRIGGER  ----
       - name: 📤 Push code to GitHub (origin)
         run: |
-          ticketsystem_avro_DIR="/root/f4-microserices-vps-configuration/ticket-store/backend/ticketsystem-avro"
-
-          echo "📁 Navigating to project directory..."
-          cd "$ticketsystem_avro_DIR"
-          # Ensure we are in the repo workspace
-          git remote -v
-          git push origin master
+          # Push current HEAD to desired branch. Adjust 'master' -> 'main' if needed.
+          git push origin HEAD:master
       # ---- JitPack: TRIGGER & CHECK ----
       - name: 🔔 Trigger JitPack build (master-SNAPSHOT)
         run: |

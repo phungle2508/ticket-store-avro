@@ -1,0 +1,55 @@
+name: 🚀 Deploy Microservice to VPS
+
+on:
+  push:
+    branches:
+      - update-vps
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: 📦 SSH Deploy to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          password: ${{ secrets.VPS_SSH_PASSWORD }}
+          port: 22
+          script: |
+            set -euo pipefail
+            ticketsystem_avro_DIR="/root/f4-microserices-vps-configuration/ticket-store/backend/ticketsystem-avro"
+
+            echo "📁 Navigating to project directory..."
+            cd "$ticketsystem_avro_DIR"
+
+            export KEYCLOAK_USERNAME='${{ secrets.KEYCLOAK_USERNAME }}'
+            export KEYCLOAK_PASSWORD='${{ secrets.KEYCLOAK_PASSWORD }}'
+
+            mvn -v
+            mvn -e -U -B clean package -Prun-openapi
+      # ---- GIT: TRIGGER  ----
+      - name: 📤 Push code to GitHub (origin)
+        run: |
+          # Ensure we are in the repo workspace
+          git remote -v
+          git push origin HEAD:update-vps
+      # ---- JitPack: TRIGGER & CHECK ----
+      - name: 🔔 Trigger JitPack build (master-SNAPSHOT)
+        run: |
+          set -euo pipefail
+          # Hitting build.log for a SNAPSHOT triggers a build if needed
+          curl -sS --max-time 5 "https://jitpack.io/com/github/phungle2508/ticket-store-avro/master-SNAPSHOT/build.log" || true
+
+      - name: 🔎 Check latest build info (any status)
+        run: |
+          set -euo pipefail
+          curl -sS "https://jitpack.io/api/builds/com.github.phungle2508/ticket-store-avro" | jq . | sed -e 's/^/JITPACK_BUILDS: /'
+
+      - name: ✅ Get latest successful build (latestOk)
+        run: |
+          set -euo pipefail
+          curl -sS "https://jitpack.io/api/builds/com.github.phungle2508/ticket-store-avro/latestOk" | jq . | sed -e 's/^/JITPACK_LATEST_OK: /'

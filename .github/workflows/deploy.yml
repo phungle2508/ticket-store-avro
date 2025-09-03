@@ -36,7 +36,7 @@ jobs:
         run: |
           # Ensure we are in the repo workspace
           git remote -v
-          git push origin HEAD:update-vps
+          git push origin master
       # ---- JitPack: TRIGGER & CHECK ----
       - name: 🔔 Trigger JitPack build (master-SNAPSHOT)
         run: |

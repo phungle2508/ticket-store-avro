@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-
+    environment: secrets
     steps:
       - name: 📦 SSH Deploy to VPS
         uses: appleboy/ssh-action@v1

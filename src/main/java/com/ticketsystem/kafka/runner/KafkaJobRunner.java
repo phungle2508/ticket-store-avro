@@ -2,27 +2,19 @@
 // Updated KafkaJobRunner.java
 package com.ticketsystem.kafka.runner;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import jakarta.annotation.PreDestroy;
-import jakarta.annotation.PostConstruct;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cloud.stream.function.StreamBridge;
-import org.springframework.stereotype.Component;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.ticketsystem.kafka.handler.EventEnvelope;
 
+import jakarta.annotation.PreDestroy;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import java.util.concurrent.*;
+
 /**
- * A job runner for managing Kafka consumer tasks.
+ * Job runner for managing Kafka consumer tasks.
  * Provides thread management and task execution for Kafka event processing.
  */
 @Component
@@ -30,288 +22,226 @@ public class KafkaJobRunner {
 
     private static final Logger log = LoggerFactory.getLogger(KafkaJobRunner.class);
 
-    private ExecutorService executorService;
-    private final StreamBridge streamBridge;
+    private final ExecutorService executorService;
+    private final int maxThreads;
+    private final long keepAliveTime;
 
-    @Value("${spring.cloud.stream.kafka.job.thread-pool-size:10}")
-    private int threadPoolSize;
-
-    @Value("${spring.cloud.stream.kafka.job.thread-name-prefix:kafka-job-}")
-    private String threadNamePrefix;
-
-    @Value("${spring.cloud.stream.kafka.job.completion-topic:job-completion}")
-    private String jobCompletionTopic;
-
-    @Value("${spring.cloud.stream.kafka.job.shutdown-timeout-seconds:60}")
-    private long shutdownTimeoutSeconds;
-
-    public KafkaJobRunner(StreamBridge streamBridge) {
-        this.streamBridge = streamBridge;
-    }
-
-    @PostConstruct
-    public void initialize() {
-        this.executorService = Executors.newFixedThreadPool(threadPoolSize, new KafkaThreadFactory(threadNamePrefix));
-        log.info("Initialized KafkaJobRunner with thread pool size: {} and thread prefix: {}", threadPoolSize,
-                threadNamePrefix);
+    /**
+     * Default constructor with reasonable defaults
+     */
+    public KafkaJobRunner() {
+        this(10, 60L, TimeUnit.SECONDS);
     }
 
     /**
-     * Submit a job to be executed asynchronously
-     * 
-     * @param jobId     unique identifier for the job
-     * @param eventName name of the event being processed
-     * @param task      the task to execute
-     * @return CompletableFuture for async handling
+     * Constructor with custom thread pool settings
      */
-    public CompletableFuture<Void> submitJob(String jobId, String eventName, Runnable task) {
-        if (executorService == null || executorService.isShutdown()) {
-            log.error("Cannot submit job {} - executor service is not available", jobId);
-            return CompletableFuture.failedFuture(new IllegalStateException("Executor service not available"));
-        }
+    public KafkaJobRunner(int maxThreads, long keepAliveTime, TimeUnit timeUnit) {
+        this.maxThreads = maxThreads;
+        this.keepAliveTime = keepAliveTime;
 
-        log.debug("Submitting job {} for event {}", jobId, eventName);
+        this.executorService = new ThreadPoolExecutor(
+                2, // corePoolSize
+                maxThreads, // maximumPoolSize
+                keepAliveTime, // keepAliveTime
+                timeUnit, // time unit
+                new LinkedBlockingQueue<>(100), // work queue with capacity
+                new ThreadFactory() {
+                    private int counter = 0;
+
+                    @Override
+                    public Thread newThread(Runnable r) {
+                        Thread t = new Thread(r, "kafka-job-runner-" + counter++);
+                        t.setDaemon(false);
+                        return t;
+                    }
+                },
+                new ThreadPoolExecutor.CallerRunsPolicy() // rejection policy
+        );
+
+        log.info("KafkaJobRunner initialized with maxThreads: {}, keepAliveTime: {} {}",
+                maxThreads, keepAliveTime, timeUnit);
+    }
+
+    /**
+     * Submit an event processing job
+     */
+    public <T> CompletableFuture<Void> submitEventJob(EventEnvelope<JsonNode> message, String messageKey,
+            Runnable task) {
+        log.debug("Submitting event job for message key: {}, event: {}", messageKey, message.getEventName());
 
         return CompletableFuture.runAsync(() -> {
-            String currentThread = Thread.currentThread().getName();
             try {
-                log.debug("Starting job {} for event {} on thread {}", jobId, eventName, currentThread);
                 long startTime = System.currentTimeMillis();
+                log.debug("Starting processing for event: {} with key: {}", message.getEventName(), messageKey);
 
                 task.run();
 
-                long duration = System.currentTimeMillis() - startTime;
-                log.debug("Completed job {} for event {} in {}ms on thread {}", jobId, eventName, duration,
-                        currentThread);
+                long processingTime = System.currentTimeMillis() - startTime;
+                log.debug("Completed processing for event: {} with key: {} in {}ms",
+                        message.getEventName(), messageKey, processingTime);
 
-                // Send completion notification
-                notifyJobCompletion(jobId, eventName, true, null, duration);
             } catch (Exception e) {
-                log.error("Job {} for event {} failed on thread {} with error: {}", jobId, eventName, currentThread,
-                        e.getMessage(), e);
-
-                // Send failure notification
-                notifyJobCompletion(jobId, eventName, false, e.getMessage(), -1);
-                throw new RuntimeException("Job execution failed", e);
+                log.error("Error processing event job for key: {}, event: {}",
+                        messageKey, message.getEventName(), e);
+                throw new RuntimeException("Event processing failed", e);
             }
         }, executorService);
     }
 
     /**
-     * Submit a job for processing an EventEnvelope with JsonNode payload
-     * 
-     * @param event the Kafka event to process
-     * @param key   the job identifier key
-     * @param task  the task to execute with the event
-     * @return CompletableFuture for async handling
+     * Submit a generic task
      */
-    public CompletableFuture<Void> submitEventJob(EventEnvelope<JsonNode> event, String key, Runnable task) {
-        if (event == null) {
-            log.error("Cannot submit event job with null event");
-            return CompletableFuture.failedFuture(new IllegalArgumentException("Event cannot be null"));
+    public CompletableFuture<Void> submitTask(Runnable task, String taskName) {
+        log.debug("Submitting generic task: {}", taskName);
+
+        return CompletableFuture.runAsync(() -> {
+            try {
+                long startTime = System.currentTimeMillis();
+                log.debug("Starting task: {}", taskName);
+
+                task.run();
+
+                long processingTime = System.currentTimeMillis() - startTime;
+                log.debug("Completed task: {} in {}ms", taskName, processingTime);
+
+            } catch (Exception e) {
+                log.error("Error executing task: {}", taskName, e);
+                throw new RuntimeException("Task execution failed: " + taskName, e);
+            }
+        }, executorService);
+    }
+
+    /**
+     * Submit a task with result
+     */
+    public <T> CompletableFuture<T> submitTaskWithResult(Callable<T> task, String taskName) {
+        log.debug("Submitting task with result: {}", taskName);
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                long startTime = System.currentTimeMillis();
+                log.debug("Starting task with result: {}", taskName);
+
+                T result = task.call();
+
+                long processingTime = System.currentTimeMillis() - startTime;
+                log.debug("Completed task with result: {} in {}ms", taskName, processingTime);
+
+                return result;
+
+            } catch (Exception e) {
+                log.error("Error executing task with result: {}", taskName, e);
+                throw new RuntimeException("Task execution failed: " + taskName, e);
+            }
+        }, executorService);
+    }
+
+    /**
+     * Get thread pool statistics
+     */
+    public ThreadPoolStats getStats() {
+        if (executorService instanceof ThreadPoolExecutor) {
+            ThreadPoolExecutor tpe = (ThreadPoolExecutor) executorService;
+            return new ThreadPoolStats(
+                    tpe.getCorePoolSize(),
+                    tpe.getMaximumPoolSize(),
+                    tpe.getActiveCount(),
+                    tpe.getPoolSize(),
+                    tpe.getTaskCount(),
+                    tpe.getCompletedTaskCount(),
+                    tpe.getQueue().size());
         }
-
-        String eventName = event.getEventName();
-        return submitJob(key, eventName, task);
+        return new ThreadPoolStats(0, maxThreads, 0, 0, 0, 0, 0);
     }
 
     /**
-     * Submit multiple jobs and return when all complete
-     * 
-     * @param jobs array of job submissions
-     * @return CompletableFuture that completes when all jobs finish
-     */
-    public CompletableFuture<Void> submitAllJobs(CompletableFuture<Void>... jobs) {
-        return CompletableFuture.allOf(jobs);
-    }
-
-    /**
-     * Get the current number of active threads in the pool
-     */
-    public int getActiveThreadCount() {
-        if (executorService instanceof java.util.concurrent.ThreadPoolExecutor) {
-            return ((java.util.concurrent.ThreadPoolExecutor) executorService).getActiveCount();
-        }
-        return -1;
-    }
-
-    /**
-     * Check if the executor service is healthy and accepting tasks
+     * Check if the executor is healthy
      */
     public boolean isHealthy() {
-        return executorService != null && !executorService.isShutdown() && !executorService.isTerminated();
-    }
-
-    /**
-     * Send job completion notification to Kafka
-     */
-    private void notifyJobCompletion(String jobId, String eventName, boolean success, String errorMessage,
-            long executionTimeMs) {
-        try {
-            JobCompletionEvent completionEvent = new JobCompletionEvent(
-                    jobId,
-                    eventName,
-                    System.currentTimeMillis(),
-                    success,
-                    errorMessage,
-                    executionTimeMs);
-
-            boolean sent = streamBridge.send(jobCompletionTopic, completionEvent);
-            if (sent) {
-                log.debug("Job completion notification sent for job {}", jobId);
-            } else {
-                log.warn("Failed to send job completion notification for job {}", jobId);
-            }
-        } catch (Exception e) {
-            log.error("Error sending job completion notification for job {}: {}", jobId, e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Custom thread factory to provide meaningful thread names and proper thread
-     * configuration
-     */
-    private static class KafkaThreadFactory implements ThreadFactory {
-        private final AtomicInteger threadNumber = new AtomicInteger(1);
-        private final String namePrefix;
-        private final ThreadGroup group;
-
-        KafkaThreadFactory(String namePrefix) {
-            SecurityManager s = System.getSecurityManager();
-            this.group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
-            this.namePrefix = namePrefix;
-        }
-
-        @Override
-        public Thread newThread(Runnable r) {
-            Thread thread = new Thread(group, r, namePrefix + threadNumber.getAndIncrement(), 0);
-
-            if (thread.isDaemon()) {
-                thread.setDaemon(false);
-            }
-            if (thread.getPriority() != Thread.NORM_PRIORITY) {
-                thread.setPriority(Thread.NORM_PRIORITY);
-            }
-
-            thread.setUncaughtExceptionHandler((t, e) -> {
-                log.error("Uncaught exception in thread {}: {}", t.getName(), e.getMessage(), e);
-            });
-
-            return thread;
-        }
-    }
-
-    /**
-     * Job completion event POJO for Kafka notifications
-     */
-    public static class JobCompletionEvent {
-        private String jobId;
-        private String eventName;
-        private long timestamp;
-        private boolean success;
-        private String errorMessage;
-        private long executionTimeMs;
-
-        public JobCompletionEvent() {
-        }
-
-        public JobCompletionEvent(String jobId, String eventName, long timestamp, boolean success,
-                String errorMessage, long executionTimeMs) {
-            this.jobId = jobId;
-            this.eventName = eventName;
-            this.timestamp = timestamp;
-            this.success = success;
-            this.errorMessage = errorMessage;
-            this.executionTimeMs = executionTimeMs;
-        }
-
-        // Getters and setters
-        public String getJobId() {
-            return jobId;
-        }
-
-        public void setJobId(String jobId) {
-            this.jobId = jobId;
-        }
-
-        public String getEventName() {
-            return eventName;
-        }
-
-        public void setEventName(String eventName) {
-            this.eventName = eventName;
-        }
-
-        public long getTimestamp() {
-            return timestamp;
-        }
-
-        public void setTimestamp(long timestamp) {
-            this.timestamp = timestamp;
-        }
-
-        public boolean isSuccess() {
-            return success;
-        }
-
-        public void setSuccess(boolean success) {
-            this.success = success;
-        }
-
-        public String getErrorMessage() {
-            return errorMessage;
-        }
-
-        public void setErrorMessage(String errorMessage) {
-            this.errorMessage = errorMessage;
-        }
-
-        public long getExecutionTimeMs() {
-            return executionTimeMs;
-        }
-
-        public void setExecutionTimeMs(long executionTimeMs) {
-            this.executionTimeMs = executionTimeMs;
-        }
-
-        @Override
-        public String toString() {
-            return "JobCompletionEvent{" +
-                    "jobId='" + jobId + '\'' +
-                    ", eventName='" + eventName + '\'' +
-                    ", timestamp=" + timestamp +
-                    ", success=" + success +
-                    ", errorMessage='" + errorMessage + '\'' +
-                    ", executionTimeMs=" + executionTimeMs +
-                    '}';
-        }
+        return !executorService.isShutdown() && !executorService.isTerminated();
     }
 
     @PreDestroy
     public void shutdown() {
-        if (executorService == null) {
-            log.info("KafkaJobRunner already shutdown or not initialized");
-            return;
-        }
+        log.info("Shutting down KafkaJobRunner...");
 
-        log.info("Shutting down KafkaJobRunner with timeout of {} seconds", shutdownTimeoutSeconds);
         executorService.shutdown();
-
         try {
-            if (!executorService.awaitTermination(shutdownTimeoutSeconds, TimeUnit.SECONDS)) {
-                log.warn("Executor did not terminate within {} seconds, forcing shutdown", shutdownTimeoutSeconds);
+            if (!executorService.awaitTermination(30, TimeUnit.SECONDS)) {
+                log.warn("Executor did not terminate gracefully, forcing shutdown");
                 executorService.shutdownNow();
 
                 if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
-                    log.error("Executor did not terminate even after forced shutdown");
+                    log.error("Executor did not terminate after forced shutdown");
                 }
-            } else {
-                log.info("KafkaJobRunner shutdown completed successfully");
             }
         } catch (InterruptedException e) {
-            log.error("Shutdown interrupted, forcing immediate termination", e);
-            Thread.currentThread().interrupt();
+            log.warn("Shutdown interrupted, forcing shutdown");
             executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+
+        log.info("KafkaJobRunner shutdown completed");
+    }
+
+    /**
+     * Thread pool statistics
+     */
+    public static class ThreadPoolStats {
+        private final int corePoolSize;
+        private final int maximumPoolSize;
+        private final int activeCount;
+        private final int poolSize;
+        private final long taskCount;
+        private final long completedTaskCount;
+        private final int queueSize;
+
+        public ThreadPoolStats(int corePoolSize, int maximumPoolSize, int activeCount,
+                int poolSize, long taskCount, long completedTaskCount, int queueSize) {
+            this.corePoolSize = corePoolSize;
+            this.maximumPoolSize = maximumPoolSize;
+            this.activeCount = activeCount;
+            this.poolSize = poolSize;
+            this.taskCount = taskCount;
+            this.completedTaskCount = completedTaskCount;
+            this.queueSize = queueSize;
+        }
+
+        // Getters
+        public int getCorePoolSize() {
+            return corePoolSize;
+        }
+
+        public int getMaximumPoolSize() {
+            return maximumPoolSize;
+        }
+
+        public int getActiveCount() {
+            return activeCount;
+        }
+
+        public int getPoolSize() {
+            return poolSize;
+        }
+
+        public long getTaskCount() {
+            return taskCount;
+        }
+
+        public long getCompletedTaskCount() {
+            return completedTaskCount;
+        }
+
+        public int getQueueSize() {
+            return queueSize;
+        }
+
+        @Override
+        public String toString() {
+            return String.format(
+                    "ThreadPoolStats{core=%d, max=%d, active=%d, pool=%d, tasks=%d, completed=%d, queue=%d}",
+                    corePoolSize, maximumPoolSize, activeCount, poolSize, taskCount, completedTaskCount, queueSize);
         }
     }
 }

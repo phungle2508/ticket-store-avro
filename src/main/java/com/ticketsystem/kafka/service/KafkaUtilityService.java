@@ -30,17 +30,17 @@ public class KafkaUtilityService<T> {
     private static final Logger PRODUCER_LOG = LoggerFactory.getLogger("KafkaProducerHelper");
     private static final Logger CONSUMER_LOG = LoggerFactory.getLogger("KafkaConsumerHelper");
 
-    private final KafkaJobRunner jobRunner;
-    private final StreamBridge streamBridge;
-    private final ObjectMapper objectMapper;
-    private final RetryTemplate retryTemplate;
-    private final EventDispatcher dispatcher;
-    private final Map<String, SseEmitter> emitters;
+    protected final KafkaJobRunner jobRunner;
+    protected final StreamBridge streamBridge;
+    protected final ObjectMapper objectMapper;
+    protected final RetryTemplate retryTemplate;
+    protected final EventDispatcher dispatcher;
+    protected final Map<String, SseEmitter> emitters;
 
-    @Value("${ssh.service-name}-input.dlq")
+    @Value("${kafka.utility.service-name:default-service}-input.dlq")
     private String dlqTopic;
 
-    @Value("${kafka.dlq.enabled:true}")
+    @Value("${kafka.utility.dlq.enabled:true}")
     private boolean dlqEnabled;
 
     @Autowired
@@ -166,11 +166,13 @@ public class KafkaUtilityService<T> {
     }
 
     /**
-     * Abstract method for mapping payload to service DTO - should be overridden by specific implementations
+     * Abstract method for mapping payload to service DTO - should be overridden by
+     * specific implementations
      */
     public <U> T consumer_mapToServiceDTO(U avroPayload) {
         CONSUMER_LOG.debug("Mapping payload to service DTO: {}", avroPayload);
-        // Default implementation returns null - should be overridden by specific implementations
+        // Default implementation returns null - should be overridden by specific
+        // implementations
         return null;
     }
 
